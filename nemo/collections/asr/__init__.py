@@ -34,7 +34,6 @@ from nemo.collections.asr.jasper import (
 )
 from nemo.collections.asr.las.misc import JasperRNNConnector
 from nemo.collections.asr.losses import CTCLossNM, AngularSoftmaxLoss
-from nemo.core import Backend
 
 __all__ = [
     'AudioToTextDataLayer',
