@@ -167,8 +167,9 @@ def create_all_dags(args, neural_factory):
         encoder.restore_from(args.checkpoint_dir + "/JasperEncoder-STEP-100.pt")
         logging.info("Pretrained Encoder loaded")
 
-    weight = None
-    xent_loss = nemo_asr.CrossEntropyLossNM(weight=weight)
+    emb_size = int(spkr_params["JasperDecoderForSpkrClass"]["emb_sizes"].split(",")[-1])
+
+    angular_loss = nemo_asr.AngularSoftmaxLoss(emb_size=emb_size,num_classes=data_layer_train.num_classes)
 
     # assemble train DAG
 
@@ -181,8 +182,8 @@ def create_all_dags(args, neural_factory):
 
     encoded, encoded_len = encoder(audio_signal=processed_signal, length=processed_signal_len)
 
-    logits, _ = decoder(encoder_output=encoded)
-    loss = xent_loss(logits=logits, labels=label)
+    embs, _ = decoder(encoder_output=encoded)
+    loss,logits = angular_loss(embs= embs, targets=label)
 
     # create train callbacks
     train_callback = nemo.core.SimpleLossLoggerCallback(
@@ -214,8 +215,8 @@ def create_all_dags(args, neural_factory):
             input_signal=audio_signal_test, length=audio_len_test
         )
         encoded_test, encoded_len_test = encoder(audio_signal=processed_signal_test, length=processed_len_test)
-        logits_test, _ = decoder(encoder_output=encoded_test)
-        loss_test = xent_loss(logits=logits_test, labels=label_test)
+        embs_test, _ = decoder(encoder_output=encoded_test)
+        loss_test,logits_test = angular_loss(embs=embs_test, targets=label_test)
 
         tagname = os.path.dirname(args.eval_datasets[i]).split("/")[-1] + "_" + str(i)
         print(tagname)
@@ -246,6 +247,7 @@ def main():
 
     # instantiate Neural Factory with supported backend
     neural_factory = nemo.core.NeuralModuleFactory(
+        backend=nemo.core.Backend.PyTorch,
         local_rank=args.local_rank,
         optimization_level=args.amp_opt_level,
         log_dir=work_dir,

@@ -409,7 +409,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
             1: AxisType(EncodedRepresentationTah) 
         """
         return {
-            "logits": NeuralType(('B', 'D'), LogitsType()),
+            "logits": NeuralType(('B', 'D'), AcousticEncodedRepresentation()),
             "embs": NeuralType(('B', 'D'), AcousticEncodedRepresentation()),
         }
 
@@ -442,7 +442,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
 
         self.mid1 = self.affineLayer(self._feat_in, self._midEmbd1, learn_mean=False)
         self.mid2 = self.affineLayer(self._midEmbd1, self._midEmbd2, learn_mean=False)
-        self.final = nn.Linear(self._midEmbd2, self._num_classes)
+        # self.final = nn.Linear(self._midEmbd2, self._num_classes,bias=False)
 
         self.apply(lambda x: init_weights(x, mode=init_mode))
         self.to(self._device)
@@ -461,12 +461,15 @@ class JasperDecoderForSpkrClass(TrainableNM):
         pool = self._pooling(encoder_output)
         mid1, emb1 = self.mid1(pool), self.mid1[:2](pool)
         mid2, embs = self.mid2(mid1), self.mid2[:2](mid1)
-        out = self.final(mid2)
 
-        return out, emb1
+        # W = nn.functional.normalize(self.final.weight, p=2, dim=1)
+        # embs = nn.functional.normalize(embs, p=2, dim=1)
+
+        # out = self.final(mid2)
+
+        return mid2, emb1
 
 
-# Siamese Network, support to be added in future releases
 # class SiameseDecoderForSpeakerClass(TrainableNM):
 #     """
 #     Jasper Decoder creates the final layer in Jasper that maps from the outputs
@@ -511,10 +514,11 @@ class JasperDecoderForSpkrClass(TrainableNM):
 #             "logits": NeuralType(('B', 'D'), LogitsType()),
 #         }
 
-#     def __init__(self, emb_size, mid_dim, init_mode="xavier_uniform"):
+#     def __init__(self, jasper_encoder, emb_size, mid_dim, init_mode="xavier_uniform"):
 #         super().__init__()
 #         self._feat_in = emb_size
 #         self._mid_dim = mid_dim
+#         self.encoder = JasperEncoder()
 
 #         self.connect = self.affineLayer(self._feat_in, self._mid_dim, learn_mean=True)
 

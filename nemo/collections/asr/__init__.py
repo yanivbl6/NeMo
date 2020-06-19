@@ -33,7 +33,8 @@ from nemo.collections.asr.jasper import (
     JasperEncoder,
 )
 from nemo.collections.asr.las.misc import JasperRNNConnector
-from nemo.collections.asr.losses import CTCLossNM
+from nemo.collections.asr.losses import CTCLossNM, AngularSoftmaxLoss
+from nemo.core import Backend
 
 __all__ = [
     'AudioToTextDataLayer',
@@ -60,4 +61,5 @@ __all__ = [
     'ContextNetDecoderForCTC',
     'CTCLossNM',
     'CrossEntropyLossNM',
+    'AngularSoftmaxLoss',
 ]
