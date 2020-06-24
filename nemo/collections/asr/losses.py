@@ -2,10 +2,11 @@
 import torch
 import torch.nn as nn
 
+from .parts.jasper import init_weights
 from nemo.backends.pytorch.nm import LossNM, TrainableNM
 from nemo.core.neural_types import *
 from nemo.utils.decorators import add_port_docs
-from .parts.jasper import init_weights
+
 
 class CTCLossNM(LossNM):
     """
@@ -63,6 +64,7 @@ class CTCLossNM(LossNM):
     def _loss_function(self, **kwargs):
         return self._loss(*(kwargs.values()))
 
+
 class AngularSoftmaxLoss(LossNM):
     """
     Neural Module wrapper for pytorch's angular margin cosine softmax loss
@@ -85,7 +87,7 @@ class AngularSoftmaxLoss(LossNM):
             # "input_length": NeuralType({0: AxisType(BatchTag)}),
             # "target_length": NeuralType({0: AxisType(BatchTag)}),
             "logits": NeuralType(('B', 'D'), LogitsType()),
-            "targets": NeuralType(('B',), LabelsType())
+            "targets": NeuralType(('B',), LabelsType()),
         }
 
     @property
@@ -96,7 +98,7 @@ class AngularSoftmaxLoss(LossNM):
             NeuralType(None)
         """
         # return {"loss": NeuralType(None)}
-        return {"loss": NeuralType(elements_type = LossType())}
+        return {"loss": NeuralType(elements_type=LossType())}
 
     def __init__(self, s=30.0, m=0.4):
         super().__init__()
@@ -113,11 +115,10 @@ class AngularSoftmaxLoss(LossNM):
         out = logits
 
         numerator = self.s * (torch.diagonal(out.transpose(0, 1)[targets]) - self.m)
-        excl = torch.cat([torch.cat((out[i, :y], out[i, y+1:])).unsqueeze(0) for i, y in enumerate(targets)], dim=0)
+        excl = torch.cat([torch.cat((out[i, :y], out[i, y + 1 :])).unsqueeze(0) for i, y in enumerate(targets)], dim=0)
         denominator = torch.exp(numerator) + torch.sum(torch.exp(self.s * excl), dim=1)
         L = numerator - torch.log(denominator)
         return -torch.mean(L)
 
     def _loss_function(self, **kwargs):
         return self._loss(*(kwargs.values()))
-

@@ -413,7 +413,15 @@ class JasperDecoderForSpkrClass(TrainableNM):
             "embs": NeuralType(('B', 'D'), AcousticEncodedRepresentation()),
         }
 
-    def __init__(self, feat_in, num_classes, emb_sizes=[1024, 1024], pool_mode='xvector', angular=False, init_mode="xavier_uniform"):
+    def __init__(
+        self,
+        feat_in,
+        num_classes,
+        emb_sizes=[1024, 1024],
+        pool_mode='xvector',
+        angular=False,
+        init_mode="xavier_uniform",
+    ):
         TrainableNM.__init__(self)
         self.angular = angular
         if angular:
@@ -430,7 +438,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
 
         self.mid1 = self.affineLayer(self._feat_in, self._midEmbd1, learn_mean=False)
         self.mid2 = self.affineLayer(self._midEmbd1, self._midEmbd2, learn_mean=False)
-        self.final = nn.Linear(self._midEmbd2, self._num_classes,bias=bias)
+        self.final = nn.Linear(self._midEmbd2, self._num_classes, bias=bias)
 
         self.apply(lambda x: init_weights(x, mode=init_mode))
         self.to(self._device)
@@ -456,7 +464,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
             out = self.final(embs)
         else:
             out = self.final(mid2)
-        
+
         return out, emb1
 
 

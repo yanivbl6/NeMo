@@ -66,7 +66,7 @@ def get_same_padding(kernel_size, stride, dilation):
 
 
 class StatsPoolLayer(nn.Module):
-    def __init__(self, feat_in, pool_mode = 'xvector'):
+    def __init__(self, feat_in, pool_mode='xvector'):
         super().__init__()
         self.feat_in = 0
         if pool_mode == 'gram':
