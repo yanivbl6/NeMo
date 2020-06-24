@@ -66,8 +66,27 @@ def get_same_padding(kernel_size, stride, dilation):
 
 
 class StatsPoolLayer(nn.Module):
-    def __init__(self, gram=False, super_vector=False):
+    def __init__(self, feat_in, pool_mode = 'xvector'):
         super().__init__()
+        self.feat_in = 0
+        if pool_mode == 'gram':
+            gram = True
+            super_vector = False
+        elif pool_mode == 'superVector':
+            gram = True
+            super_vector = True
+        else:
+            gram = False
+            super_vector = False
+
+        if gram:
+            self.feat_in += feat_in ** 2
+        else:
+            self.feat_in += 2 * feat_in
+
+        if super_vector and gram:
+            self.feat_in += 2 * feat_in
+
         self.gram = gram
         self.super = super_vector
 
@@ -80,7 +99,6 @@ class StatsPoolLayer(nn.Module):
 
         if self.gram:
             time_len = encoder_output.shape[-1]
-            # encoder_output = encoder_output
             cov = encoder_output.bmm(encoder_output.transpose(2, 1))  # cov matrix
             cov = cov.view(cov.shape[0], -1) / (time_len)
 

@@ -28,7 +28,7 @@ from nemo.collections.asr.helpers import (
     process_classification_evaluation_epoch,
 )
 from nemo.utils import logging
-from nemo.utils.lr_policies import CosineAnnealing
+from nemo.utils import lr_policies
 
 
 def parse_args():
@@ -62,12 +62,13 @@ def parse_args():
     parser.add_argument("--exp_name", default="SpkrReco_GramMatrix", type=str)
     parser.add_argument("--beta1", default=0.95, type=float)
     parser.add_argument("--beta2", default=0.5, type=float)
-    parser.add_argument("--warmup_steps", default=1000, type=int)
+    parser.add_argument("--warmup_ratio", default=0.1, type=float)
     parser.add_argument("--load_dir", default=None, type=str)
     parser.add_argument("--synced_bn", action="store_true", help="Use synchronized batch norm")
     parser.add_argument("--emb_size", default=256, type=int)
     parser.add_argument("--synced_bn_groupsize", default=0, type=int)
     parser.add_argument("--print_freq", default=256, type=int)
+    parser.add_argument("--lr_policy", default=None,type=str)
 
     args = parser.parse_args()
     if args.max_steps is not None:
@@ -162,6 +163,7 @@ def create_all_dags(args, neural_factory):
         num_classes=data_layer_train.num_classes,
         pool_mode=spkr_params["JasperDecoderForSpkrClass"]['pool_mode'],
         emb_sizes=spkr_params["JasperDecoderForSpkrClass"]["emb_sizes"].split(","),
+        angular=spkr_params["JasperDecoderForSpkrClass"]["angular"],
     )
     if os.path.exists(args.checkpoint_dir + "/JasperEncoder-STEP-100.pt"):
         encoder.restore_from(args.checkpoint_dir + "/JasperEncoder-STEP-100.pt")
@@ -268,13 +270,20 @@ def main():
         args, neural_factory
     )
 
+    if args.lr_policy is not None:
+        try:
+            lr_method = getattr(lr_policies, args.lr_policy)
+            lr_schedule = lr_method(args.num_epochs * steps_per_epoch, warmup_ratio=args.warmup_ratio)
+            logging.info("using lr policy {}".format(args.lr_policy))
+        except:
+            raise NameError("Mentioned lr policy is not part of nemo lr_policies")
+    else:
+        lr_schedule = None
     # train model
     neural_factory.train(
         tensors_to_optimize=[train_loss],
         callbacks=callbacks,
-        lr_policy=CosineAnnealing(
-            args.num_epochs * steps_per_epoch, warmup_steps=0.1 * args.num_epochs * steps_per_epoch,
-        ),
+        lr_policy=lr_schedule,
         optimizer=args.optimizer,
         optimization_params={
             "num_epochs": args.num_epochs,

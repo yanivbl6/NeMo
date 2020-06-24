@@ -409,40 +409,28 @@ class JasperDecoderForSpkrClass(TrainableNM):
             1: AxisType(EncodedRepresentationTah) 
         """
         return {
-            "logits": NeuralType(('B', 'D'), AcousticEncodedRepresentation()),
+            "logits": NeuralType(('B', 'D'), LogitsType()),
             "embs": NeuralType(('B', 'D'), AcousticEncodedRepresentation()),
         }
 
-    def __init__(self, feat_in, num_classes, emb_sizes=[1024, 1024], pool_mode='xvector', init_mode="xavier_uniform"):
+    def __init__(self, feat_in, num_classes, emb_sizes=[1024, 1024], pool_mode='xvector', angular=False, init_mode="xavier_uniform"):
         TrainableNM.__init__(self)
-        self._feat_in = 0
-        if pool_mode == 'gram':
-            gram = True
-            super_vector = False
-        elif pool_mode == 'superVector':
-            gram = True
-            super_vector = True
+        self.angular = angular
+        if angular:
+            bias = False
         else:
-            gram = False
-            super_vector = False
-
-        if gram:
-            self._feat_in += feat_in ** 2
-        else:
-            self._feat_in += 2 * feat_in
-
-        if super_vector and gram:
-            self._feat_in += 2 * feat_in
+            bias = True
 
         self._midEmbd1 = int(emb_sizes[0])  # Spkr Vector Embedding Shape
-        self._midEmbd2 = int(emb_sizes[1]) if len(emb_sizes) > 1 else 0  # Spkr Vector Embedding Shape
+        self._midEmbd2 = int(emb_sizes[1]) if len(emb_sizes) > 1 else 1024  # Spkr Vector Embedding Shape
 
         self._num_classes = num_classes
-        self._pooling = StatsPoolLayer(gram=gram, super_vector=super_vector)
+        self._pooling = StatsPoolLayer(feat_in=feat_in, pool_mode=pool_mode)
+        self._feat_in = self._pooling.feat_in
 
         self.mid1 = self.affineLayer(self._feat_in, self._midEmbd1, learn_mean=False)
         self.mid2 = self.affineLayer(self._midEmbd1, self._midEmbd2, learn_mean=False)
-        # self.final = nn.Linear(self._midEmbd2, self._num_classes,bias=False)
+        self.final = nn.Linear(self._midEmbd2, self._num_classes,bias=bias)
 
         self.apply(lambda x: init_weights(x, mode=init_mode))
         self.to(self._device)
@@ -462,12 +450,14 @@ class JasperDecoderForSpkrClass(TrainableNM):
         mid1, emb1 = self.mid1(pool), self.mid1[:2](pool)
         mid2, embs = self.mid2(mid1), self.mid2[:2](mid1)
 
-        # W = nn.functional.normalize(self.final.weight, p=2, dim=1)
-        # embs = nn.functional.normalize(embs, p=2, dim=1)
-
-        # out = self.final(mid2)
-
-        return mid2, emb1
+        if self.angular:
+            self.final.weight = nn.Parameter(nn.functional.normalize(self.final.weight, p=2, dim=1))
+            embs = nn.functional.normalize(mid2, p=2, dim=1)
+            out = self.final(embs)
+        else:
+            out = self.final(mid2)
+        
+        return out, emb1
 
 
 # class SiameseDecoderForSpeakerClass(TrainableNM):

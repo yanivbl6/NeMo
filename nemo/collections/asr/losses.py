@@ -84,7 +84,7 @@ class AngularSoftmaxLoss(LossNM):
             # "targets": NeuralType({0: AxisType(BatchTag), 1: AxisType(TimeTag)}),
             # "input_length": NeuralType({0: AxisType(BatchTag)}),
             # "target_length": NeuralType({0: AxisType(BatchTag)}),
-            "embs": NeuralType(('B', 'D'), AcousticEncodedRepresentation()),
+            "logits": NeuralType(('B', 'D'), LogitsType()),
             "targets": NeuralType(('B',), LabelsType())
         }
 
@@ -96,28 +96,27 @@ class AngularSoftmaxLoss(LossNM):
             NeuralType(None)
         """
         # return {"loss": NeuralType(None)}
-        return {"loss": NeuralType(elements_type = LossType()),
-                "logits": NeuralType(('B', 'D'), AcousticEncodedRepresentation())}
+        return {"loss": NeuralType(elements_type = LossType())}
 
-    def __init__(self, emb_size, num_classes, s=30.0, m=0.4):
+    def __init__(self, s=30.0, m=0.4):
         super().__init__()
 
-        self.linear = nn.Linear(emb_size,num_classes,bias=False).to(self._device)
         self.eps = 1e-7
         self.s = s
         self.m = m
 
-    def _loss(self, embs, targets):
-        W = nn.functional.normalize(self.linear.weight, p=2, dim=1)
-        embs = nn.functional.normalize(embs, p=2, dim=1)
+    def _loss(self, logits, targets):
+        # W = nn.functional.normalize(self.linear.weight, p=2, dim=1)
+        # embs = nn.functional.normalize(embs, p=2, dim=1)
 
-        out = self.linear(embs)
+        # out = self.linear(embs)
+        out = logits
 
         numerator = self.s * (torch.diagonal(out.transpose(0, 1)[targets]) - self.m)
         excl = torch.cat([torch.cat((out[i, :y], out[i, y+1:])).unsqueeze(0) for i, y in enumerate(targets)], dim=0)
         denominator = torch.exp(numerator) + torch.sum(torch.exp(self.s * excl), dim=1)
         L = numerator - torch.log(denominator)
-        return -torch.mean(L),out
+        return -torch.mean(L)
 
     def _loss_function(self, **kwargs):
         return self._loss(*(kwargs.values()))
