@@ -27,8 +27,7 @@ from nemo.collections.asr.helpers import (
     process_classification_evaluation_batch,
     process_classification_evaluation_epoch,
 )
-from nemo.utils import logging
-from nemo.utils import lr_policies
+from nemo.utils import logging, lr_policies
 
 
 def parse_args():
@@ -68,7 +67,8 @@ def parse_args():
     parser.add_argument("--emb_size", default=256, type=int)
     parser.add_argument("--synced_bn_groupsize", default=0, type=int)
     parser.add_argument("--print_freq", default=256, type=int)
-    parser.add_argument("--lr_policy", default=None,type=str)
+    parser.add_argument("--lr_policy", default=None, type=str)
+    parser.add_argument("--random_seed", default=42, type=int)
 
     args = parser.parse_args()
     if args.max_steps is not None:
@@ -185,7 +185,7 @@ def create_all_dags(args, neural_factory):
     encoded, encoded_len = encoder(audio_signal=processed_signal, length=processed_signal_len)
 
     logits, _ = decoder(encoder_output=encoded)
-    loss = angular_loss(logits= logits, targets=label)
+    loss = angular_loss(logits=logits, targets=label)
 
     # create train callbacks
     train_callback = nemo.core.SimpleLossLoggerCallback(
@@ -245,7 +245,7 @@ def main():
     )
     work_dir = name
     if args.work_dir:
-        work_dir = os.path.join(args.work_dir,"logs", name)
+        work_dir = os.path.join(args.work_dir, "logs", name)
 
     # instantiate Neural Factory with supported backend
     neural_factory = nemo.core.NeuralModuleFactory(
@@ -255,7 +255,7 @@ def main():
         checkpoint_dir=args.checkpoint_dir + "/" + args.exp_name,
         create_tb_writer=args.create_tb_writer,
         files_to_copy=[args.model_config, __file__],
-        random_seed=42,
+        random_seed=args.random_seed,
         cudnn_benchmark=args.cudnn_benchmark,
         tensorboard_dir=args.tensorboard_dir + "/" + name,
     )
@@ -280,7 +280,6 @@ def main():
             raise NameError("Mentioned lr policy is not found as part of nemo lr_policies")
     else:
         lr_schedule = None
-
 
     # train model
     neural_factory.train(
