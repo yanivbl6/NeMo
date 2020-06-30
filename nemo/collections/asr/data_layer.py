@@ -934,6 +934,7 @@ target_label_n, "offset": offset_in_sec_n}
         load_audio: bool = True,
         augmentor: Optional[Union[AudioAugmentor, Dict[str, Dict[str, Any]]]] = None,
         time_length: int = 0,
+        removedLabels: list = [],
     ):
         super(AudioToSpeechLabelDataLayer, self).__init__()
 
@@ -954,12 +955,14 @@ target_label_n, "offset": offset_in_sec_n}
             'min_duration': min_duration,
             'trim': trim_silence,
             'load_audio': load_audio,
+            'removedLabels': removedLabels,
         }
         self._dataset = AudioLabelDataset(**dataset_params)
 
         self.num_classes = self._dataset.num_commands
         logging.info("# of classes :{}".format(self.num_classes))
         self.labels = self._dataset.labels
+        self.removedLabels = self._dataset.removedLabels
         # Set up data loader
         if self._placement == DeviceType.AllGpu:
             logging.info("Parallelizing Datalayer.")

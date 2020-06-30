@@ -436,9 +436,11 @@ class AudioLabelDataset(Dataset):
         min_duration=None,
         trim=False,
         load_audio=True,
+        removedLabels=[],
     ):
         self.collection = collections.ASRSpeechLabel(
             manifests_files=manifest_filepath.split(','), min_duration=min_duration, max_duration=max_duration,
+            removedLabels=removedLabels,
         )
 
         self.featurizer = featurizer
@@ -446,6 +448,7 @@ class AudioLabelDataset(Dataset):
         self.load_audio = load_audio
 
         self.labels = labels if labels else self.collection.uniq_labels
+        self.removedLabels = self.collection.removedLabels
         self.num_commands = len(self.labels)
 
         self.label2id, self.id2label = {}, {}

@@ -439,6 +439,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
         self.mid1 = self.affineLayer(self._feat_in, self._midEmbd1, learn_mean=False)
         self.mid2 = self.affineLayer(self._midEmbd1, self._midEmbd2, learn_mean=False)
         self.final = nn.Linear(self._midEmbd2, self._num_classes, bias=bias)
+        # self.bnorm = nn.BatchNorm1d(self._num_classes, affine=False, track_running_stats=True)
 
         self.apply(lambda x: init_weights(x, mode=init_mode))
         self.to(self._device)
@@ -463,6 +464,8 @@ class JasperDecoderForSpkrClass(TrainableNM):
             self.final.weight = nn.Parameter(nn.functional.normalize(self.final.weight, p=2, dim=1))
             embs = nn.functional.normalize(mid2, p=2, dim=1)
             out = self.final(embs)
+            # out = self.bnorm(out)
+
         else:
             out = self.final(mid2)
 

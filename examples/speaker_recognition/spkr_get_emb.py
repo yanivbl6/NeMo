@@ -57,12 +57,13 @@ def parse_args():
     parser.add_argument("--exp_name", default="SpkrReco_GramMatrix", type=str)
     parser.add_argument("--beta1", default=0.95, type=float)
     parser.add_argument("--beta2", default=0.5, type=float)
-    parser.add_argument("--warmup_steps", default=1000, type=int)
+    parser.add_argument("--warmup_ratio", default=0.1, type=float)
     parser.add_argument("--load_dir", default=None, type=str)
     parser.add_argument("--synced_bn", action='store_true', help="Use synchronized batch norm")
     parser.add_argument("--synced_bn_groupsize", default=0, type=int)
     parser.add_argument("--emb_size", default=256, type=int)
     parser.add_argument("--print_freq", default=256, type=int)
+    parser.add_argument("--random_seed", default=42, type=int)
 
     args = parser.parse_args()
     if args.max_steps is not None:
@@ -108,6 +109,7 @@ def create_all_dags(args, neural_factory):
         labels=None,
         batch_size=args.batch_size,
         num_workers=cpu_per_traindl,
+        removedLabels=['dummy'],
         **eval_dl_params,
         # normalize_transcripts=False
     )
@@ -122,9 +124,10 @@ def create_all_dags(args, neural_factory):
 
     decoder = nemo_asr.JasperDecoderForSpkrClass(
         feat_in=spkr_params['JasperEncoder']['jasper'][-1]['filters'],
-        num_classes=254,
+        num_classes=1251,
         emb_sizes=spkr_params['JasperDecoderForSpkrClass']['emb_sizes'].split(','),
         pool_mode=spkr_params["JasperDecoderForSpkrClass"]['pool_mode'],
+        angular=spkr_params["JasperDecoderForSpkrClass"]["angular"]
     )
 
     # --- Assemble Validation DAG --- #
@@ -184,13 +187,13 @@ def main():
     for line in manifest:
         line = line.strip()
         dic = json.loads(line)
-        filename = dic['audio_filepath'].split('/')[-1]
+        filename = dic['audio_filepath'].split('/')[-3]
         whole_labels.append(filename)
 
     for idx in range(len(inf_label)):
         whole_embs.extend(inf_emb[idx].numpy())
 
-    embedding_dir = args.work_dir + './embeddings/'
+    embedding_dir = os.path.join(args.work_dir,'embeddings/')
     if not os.path.exists(embedding_dir):
         os.mkdir(embedding_dir)
 

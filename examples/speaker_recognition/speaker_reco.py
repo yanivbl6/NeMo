@@ -142,6 +142,7 @@ def create_all_dags(args, neural_factory):
             batch_size=args.batch_size,
             num_workers=cpu_per_traindl,
             time_length=time_length,
+            removedLabels=data_layer_train.removedLabels,
             **eval_dl_params,
             # normalize_transcripts=False
         )
@@ -201,7 +202,7 @@ def create_all_dags(args, neural_factory):
         chpt_callback = nemo.core.CheckpointCallback(
             folder=args.checkpoint_dir,
             load_from_folder=args.checkpoint_dir,  # load dir
-            step_freq=args.checkpoint_save_freq,
+            step_freq=args.checkpoint_save_freq*steps_per_epoch,
             checkpoints_to_keep=125,
         )
 
@@ -225,7 +226,7 @@ def create_all_dags(args, neural_factory):
             eval_tensors=[loss_test, logits_test, label_test],
             user_iter_callback=partial(process_classification_evaluation_batch, top_k=1),
             user_epochs_done_callback=partial(process_classification_evaluation_epoch, tag=tagname),
-            eval_step=args.eval_freq,  # How often we evaluate the model on the test set
+            eval_step=args.eval_freq*steps_per_epoch,  # How often we evaluate the model on the test set
             tb_writer=neural_factory.tb_writer,
         )
 
