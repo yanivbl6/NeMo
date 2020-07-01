@@ -219,8 +219,9 @@ class SpeechLabel(_Collection):
         output_type = self.OUTPUT_TYPE
         data, duration_filtered = [], 0.0
         from collections import Counter
+
         label_counter = Counter(labels)
-        min_speaker_sample = 0 if len(removedLabels) else 60
+        min_speaker_sample = 0 if len(removedLabels) else 0
         for audio_file, duration, command, offset in zip(audio_files, durations, labels, offsets):
             # Duration filters.
             if min_duration is not None and duration < min_duration:
@@ -253,7 +254,7 @@ class SpeechLabel(_Collection):
             "Filtered duration for loading collection is %f.", duration_filtered,
         )
         self.uniq_labels = sorted(set(map(lambda x: x.label, data)))
-        self.removedLabels = removedLabels 
+        self.removedLabels = removedLabels
         logging.info("# {} files loaded accounting to # {} labels".format(len(data), len(self.uniq_labels)))
 
         super().__init__(data)

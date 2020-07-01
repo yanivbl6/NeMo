@@ -439,7 +439,9 @@ class AudioLabelDataset(Dataset):
         removedLabels=[],
     ):
         self.collection = collections.ASRSpeechLabel(
-            manifests_files=manifest_filepath.split(','), min_duration=min_duration, max_duration=max_duration,
+            manifests_files=manifest_filepath.split(','),
+            min_duration=min_duration,
+            max_duration=max_duration,
             removedLabels=removedLabels,
         )
 

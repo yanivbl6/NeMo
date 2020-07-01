@@ -213,7 +213,6 @@ def process_classification_evaluation_batch(tensors: dict, global_vars: dict, to
     if 'labels' not in global_vars.keys():
         global_vars['labels'] = []
 
-
     if isinstance(top_k, int):
         top_k = [top_k]
 
@@ -237,8 +236,8 @@ def process_classification_evaluation_batch(tensors: dict, global_vars: dict, to
     batch_size = labels.size(0)
     global_vars['batchsize'] += [batch_size]
     # import ipdb; ipdb.set_trace()
-    global_vars['logits'] +=[logits.argmax(dim=1)]
-    global_vars['labels'] +=[labels]
+    global_vars['logits'] += [logits.argmax(dim=1)]
+    global_vars['labels'] += [labels]
 
     with torch.no_grad():
         topk_acc = classification_accuracy(logits, labels, top_k=top_k)
@@ -275,11 +274,11 @@ def process_classification_evaluation_epoch(global_vars: dict, eval_metric=None,
         tag = ''
 
     logs = {f"Evaluation_Loss {tag}": eloss}
-    
+
     targets = torch.cat(global_vars['logits'])
     labels = torch.cat(global_vars['labels'])
-    nb_classes = torch.max(labels)+1
-    
+    nb_classes = torch.max(labels) + 1
+
     # count_list = []
     # for spkr in range(nb_classes):
     #     lab = (labels == spkr).nonzero().cpu().numpy().reshape(-1).tolist()
