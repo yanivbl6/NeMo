@@ -37,7 +37,7 @@ JasperEncoder:
             dilation: [1]
             dropout: *drop
             residual: true
-            separable: false
+            separable: true
 
         -   filters: *n_filters
             repeat: *rep
@@ -46,7 +46,7 @@ JasperEncoder:
             dilation: [1]
             dropout: *drop
             residual: true
-            separable: false
+            separable: true
 
         -   filters: *n_filters
             repeat: *rep
@@ -55,7 +55,7 @@ JasperEncoder:
             dilation: [1]
             dropout: *drop
             residual: true
-            separable: false
+            separable: true
 
         -   filters: *n_filters
             repeat: *rep
@@ -64,7 +64,7 @@ JasperEncoder:
             dilation: [1]
             dropout: *drop
             residual: true
-            separable: false
+            separable: true
 
         -   filters: &enc_feat_out 1500
             repeat: 1
@@ -73,10 +73,10 @@ JasperEncoder:
             dilation: [1]
             dropout: 0.0
             residual: false
-            separable: false
+            separable: true
 
 JasperDecoderForSpkrClass:
     feat_in: *enc_feat_out
     pool_mode: 'xvector'
     emb_sizes: 1024,1024
-    angular: true
+    angular: True
