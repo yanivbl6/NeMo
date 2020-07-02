@@ -201,7 +201,6 @@ class SpeechLabel(_Collection):
         max_duration: Optional[float] = None,
         max_number: Optional[int] = None,
         do_sort_by_duration: bool = False,
-        removedLabels: List[Optional[str]] = [],
     ):
         """Instantiates audio-label manifest with filters and preprocessing.
 
@@ -215,13 +214,9 @@ class SpeechLabel(_Collection):
             max_number: Maximum number of samples to collect.
             do_sort_by_duration: True if sort samples list by duration.
         """
-        ignoreLabels = True if len(removedLabels) else False
         output_type = self.OUTPUT_TYPE
         data, duration_filtered = [], 0.0
-        from collections import Counter
 
-        label_counter = Counter(labels)
-        min_speaker_sample = 0 if len(removedLabels) else 0
         for audio_file, duration, command, offset in zip(audio_files, durations, labels, offsets):
             # Duration filters.
             if min_duration is not None and duration < min_duration:
@@ -229,15 +224,6 @@ class SpeechLabel(_Collection):
                 continue
 
             if max_duration is not None and duration > max_duration:
-                duration_filtered += duration
-                continue
-
-            if label_counter[command] < min_speaker_sample:
-                duration_filtered += duration
-                removedLabels.append(command)
-                continue
-
-            if ignoreLabels and command in removedLabels:
                 duration_filtered += duration
                 continue
 
@@ -254,7 +240,6 @@ class SpeechLabel(_Collection):
             "Filtered duration for loading collection is %f.", duration_filtered,
         )
         self.uniq_labels = sorted(set(map(lambda x: x.label, data)))
-        self.removedLabels = removedLabels
         logging.info("# {} files loaded accounting to # {} labels".format(len(data), len(self.uniq_labels)))
 
         super().__init__(data)

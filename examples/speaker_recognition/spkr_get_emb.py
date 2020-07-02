@@ -109,7 +109,6 @@ def create_all_dags(args, neural_factory):
         labels=None,
         batch_size=args.batch_size,
         num_workers=cpu_per_traindl,
-        removedLabels=['dummy'],
         **eval_dl_params,
         # normalize_transcripts=False
     )
@@ -127,7 +126,7 @@ def create_all_dags(args, neural_factory):
         num_classes=1251,
         emb_sizes=spkr_params['JasperDecoderForSpkrClass']['emb_sizes'].split(','),
         pool_mode=spkr_params["JasperDecoderForSpkrClass"]['pool_mode'],
-        angular=spkr_params["JasperDecoderForSpkrClass"]["angular"]
+        angular=spkr_params["JasperDecoderForSpkrClass"]["angular"],
     )
 
     # --- Assemble Validation DAG --- #
@@ -193,7 +192,7 @@ def main():
     for idx in range(len(inf_label)):
         whole_embs.extend(inf_emb[idx].numpy())
 
-    embedding_dir = os.path.join(args.work_dir,'embeddings/')
+    embedding_dir = os.path.join(args.work_dir, 'embeddings/')
     if not os.path.exists(embedding_dir):
         os.mkdir(embedding_dir)
 

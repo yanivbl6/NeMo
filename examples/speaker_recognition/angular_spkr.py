@@ -68,7 +68,7 @@ def parse_args():
     parser.add_argument("--synced_bn_groupsize", default=0, type=int)
     parser.add_argument("--print_freq", default=256, type=int)
     parser.add_argument("--lr_policy", default=None, type=str)
-    parser.add_argument("--random_seed", default=42, type=int)
+    parser.add_argument("--random_seed", default=None, type=int)
 
     args = parser.parse_args()
     if args.max_steps is not None:
@@ -142,7 +142,6 @@ def create_all_dags(args, neural_factory):
             batch_size=args.batch_size,
             num_workers=cpu_per_traindl,
             time_length=time_length,
-            removedLabels=data_layer_train.removedLabels,
             **eval_dl_params,
             # normalize_transcripts=False
         )

@@ -142,7 +142,6 @@ def create_all_dags(args, neural_factory):
             batch_size=args.batch_size,
             num_workers=cpu_per_traindl,
             time_length=time_length,
-            removedLabels=data_layer_train.removedLabels,
             **eval_dl_params,
             # normalize_transcripts=False
         )
