@@ -69,6 +69,7 @@ def parse_args():
     parser.add_argument("--print_freq", default=256, type=int)
     parser.add_argument("--lr_policy", default=None, type=str)
     parser.add_argument("--random_seed", default=None, type=int)
+    parser.add_argument("--pretrainedFolder",default=None,type=str)
 
     args = parser.parse_args()
     if args.max_steps is not None:
@@ -198,12 +199,19 @@ def create_all_dags(args, neural_factory):
 
     callbacks = [train_callback]
 
+    if args.pretrainedFolder:
+        ignore_keys = "final"
+    else:
+        ignore_keys = ""
+
     if args.checkpoint_dir or args.load_dir:
         chpt_callback = nemo.core.CheckpointCallback(
             folder=args.checkpoint_dir,
-            load_from_folder=args.checkpoint_dir,  # load dir
+            load_from_folder=args.pretrainedFolder,  # load dir
             step_freq=args.checkpoint_save_freq * steps_per_epoch,
-            checkpoints_to_keep=125,
+            checkpoints_to_keep=20,
+            force_load=False,
+            ignore_keys=ignore_keys,
         )
 
         callbacks.append(chpt_callback)

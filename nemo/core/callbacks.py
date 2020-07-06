@@ -410,6 +410,7 @@ class CheckpointCallback(NeMoCallback):
         epoch_freq: int = -1,
         checkpoints_to_keep: int = 4,
         force_load: bool = False,
+        ignore_keys: str = "",
     ):
         if step_freq == -1 and epoch_freq == -1:
             logging.warning("No checkpoints will be saved because step_freq and epoch_freq are both -1.")
@@ -426,6 +427,8 @@ class CheckpointCallback(NeMoCallback):
         self._saved_ckpts = []
         # If True, run will fail if we cannot load module weights
         self._force_load = force_load
+        self._ignore_keys = ignore_keys
+
 
     def __save_to(self, path, state):
         if state["global_rank"] is not None and state["global_rank"] != 0:
@@ -489,8 +492,8 @@ class CheckpointCallback(NeMoCallback):
                         logging.warning("Restoring from modules checkpoints where the training step does not match")
                         break
 
-                for mod, checkpoint in zip(modules_to_restore, module_checkpoints):
-                    mod.restore_from(checkpoint, state["local_rank"])
+                for mod, checkpoint in zip(modules_to_restore, module_checkpoints):                    
+                    mod.restore_from(checkpoint, state["local_rank"],ignore_keys=self._ignore_keys)
             except (ValueError) as e:
                 if self._force_load:
                     raise ValueError(

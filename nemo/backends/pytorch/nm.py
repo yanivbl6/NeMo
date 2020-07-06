@@ -23,6 +23,7 @@ import torch.nn as nn
 
 from nemo.core import DeviceType, ModuleType, NeuralModule, OperationMode, WeightShareTransform
 from nemo.utils.helpers import get_cuda_device, rgetattr, rsetattr
+from nemo.utils import logging
 
 
 class TrainableNM(NeuralModule, nn.Module):
@@ -115,13 +116,19 @@ class TrainableNM(NeuralModule, nn.Module):
         t.save(self.state_dict(), path)
 
     @t.jit.ignore
-    def restore_from(self, path, local_rank=0):
+    def restore_from(self, path, local_rank=0,ignore_keys="final"):
         # self._pt_module.load_state_dict(t.load(path))
         if self.placement == DeviceType.AllGpu:
             load_device = f"cuda:{local_rank}"
         else:
             load_device = self._device
-        self.load_state_dict(t.load(path, map_location=load_device))
+        pretrained_model = t.load(path, map_location=load_device)
+        if len(ignore_keys):
+            for key, _ in pretrained_model.items():
+                if ignore_keys in key:
+                    logging.info("Ignored {} keys from loaded module".format(key))
+                    del pretrained_model[key]                
+        self.load_state_dict(pretrained_model,strict=False)
 
     @t.jit.ignore
     def freeze(self, weights=None):

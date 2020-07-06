@@ -123,7 +123,7 @@ def create_all_dags(args, neural_factory):
 
     decoder = nemo_asr.JasperDecoderForSpkrClass(
         feat_in=spkr_params['JasperEncoder']['jasper'][-1]['filters'],
-        num_classes=1251,
+        num_classes=120,
         emb_sizes=spkr_params['JasperDecoderForSpkrClass']['emb_sizes'].split(','),
         pool_mode=spkr_params["JasperDecoderForSpkrClass"]['pool_mode'],
         angular=spkr_params["JasperDecoderForSpkrClass"]["angular"],
@@ -186,7 +186,7 @@ def main():
     for line in manifest:
         line = line.strip()
         dic = json.loads(line)
-        filename = dic['audio_filepath'].split('/')[-3]
+        filename = dic['audio_filepath'].split('/')[-1]
         whole_labels.append(filename)
 
     for idx in range(len(inf_label)):

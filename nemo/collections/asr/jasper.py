@@ -461,7 +461,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
 
         if self.angular:
 
-            # self.final.weight = nn.Parameter(nn.functional.normalize(self.final.weight, p=2, dim=1))
+            self.final.weight = nn.Parameter(nn.functional.normalize(self.final.weight, p=2, dim=1))
             embs = nn.functional.normalize(mid2, p=2, dim=1)
             out = self.final(embs)
             # out = self.bnorm(out)
