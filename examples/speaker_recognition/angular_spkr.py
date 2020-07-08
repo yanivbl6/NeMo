@@ -68,7 +68,7 @@ def parse_args():
     parser.add_argument("--synced_bn_groupsize", default=0, type=int)
     parser.add_argument("--print_freq", default=256, type=int)
     parser.add_argument("--lr_policy", default=None, type=str)
-    parser.add_argument("--random_seed", default=None, type=int)
+    parser.add_argument("--random_seed", default=42, type=int)
     parser.add_argument("--pretrainedFolder",default=None,type=str)
 
     args = parser.parse_args()

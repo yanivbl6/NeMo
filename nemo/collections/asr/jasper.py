@@ -469,7 +469,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
         else:
             out = self.final(mid2)
 
-        return out, emb1
+        return out, embs
 
 
 # class SiameseDecoderForSpeakerClass(TrainableNM):
