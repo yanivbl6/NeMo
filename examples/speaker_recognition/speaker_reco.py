@@ -69,8 +69,8 @@ def parse_args():
     parser.add_argument("--print_freq", default=256, type=int)
     parser.add_argument("--lr_policy", default=None, type=str)
     parser.add_argument("--random_seed", default=42, type=int)
-    parser.add_argument("--pretrainedFolder",default=None,type=str)
-    
+    parser.add_argument("--pretrainedFolder", default=None, type=str)
+
     args = parser.parse_args()
     if args.max_steps is not None:
         raise ValueError("QuartzNet uses num_epochs instead of max_steps")
@@ -159,16 +159,20 @@ def create_all_dags(args, neural_factory):
     # (QuartzNet uses the Jasper baseline encoder and decoder)
     encoder = nemo_asr.JasperEncoder(**spkr_params["JasperEncoder"],)
 
+    emb_sizes = spkr_params["JasperDecoderForSpkrClass"]["emb_sizes"]
+
+    if type(emb_sizes) is str:
+        emb_sizes = emb_sizes.split(',')
+    else:
+        emb_sizes = [emb_sizes]
+
     decoder = nemo_asr.JasperDecoderForSpkrClass(
         feat_in=spkr_params["JasperEncoder"]["jasper"][-1]["filters"],
         num_classes=data_layer_train.num_classes,
         pool_mode=spkr_params["JasperDecoderForSpkrClass"]['pool_mode'],
-        emb_sizes=spkr_params["JasperDecoderForSpkrClass"]["emb_sizes"].split(","),
+        emb_sizes=emb_sizes,
         angular=spkr_params["JasperDecoderForSpkrClass"]["angular"],
     )
-    if os.path.exists(args.checkpoint_dir + "/JasperEncoder-STEP-100.pt"):
-        encoder.restore_from(args.checkpoint_dir + "/JasperEncoder-STEP-100.pt")
-        logging.info("Pretrained Encoder loaded")
 
     weight = None
     xent_loss = nemo_asr.CrossEntropyLossNM(weight=weight)
@@ -287,7 +291,7 @@ def main():
             raise NameError("Mentioned lr policy is not part of nemo lr_policies")
     else:
         lr_schedule = None
-        
+
     # train model
     neural_factory.train(
         tensors_to_optimize=[train_loss],

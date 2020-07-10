@@ -429,17 +429,25 @@ class JasperDecoderForSpkrClass(TrainableNM):
         else:
             bias = True
 
-        self._midEmbd1 = int(emb_sizes[0])  # Spkr Vector Embedding Shape
-        self._midEmbd2 = int(emb_sizes[1]) if len(emb_sizes) > 1 else 1024  # Spkr Vector Embedding Shape
+        if type(emb_sizes) is not list:
+            emb_sizes = list(emb_sizes)
 
         self._num_classes = num_classes
         self._pooling = StatsPoolLayer(feat_in=feat_in, pool_mode=pool_mode)
         self._feat_in = self._pooling.feat_in
 
-        self.mid1 = self.affineLayer(self._feat_in, self._midEmbd1, learn_mean=False)
-        self.mid2 = self.affineLayer(self._midEmbd1, self._midEmbd2, learn_mean=False)
-        self.final = nn.Linear(self._midEmbd2, self._num_classes, bias=bias)
-        # self.bnorm = nn.BatchNorm1d(self._num_classes, affine=False, track_running_stats=True)
+        shapes = [self._feat_in]
+        for size in emb_sizes:
+            shapes.append(int(size))
+
+        emb_layers = []
+        for shape_in, shape_out in zip(shapes[:-1], shapes[1:]):
+            layer = self.affineLayer(shape_in, shape_out, learn_mean=False)
+            emb_layers.append(layer)
+
+        self.emb_layers = nn.ModuleList(emb_layers)
+
+        self.final = nn.Linear(shapes[-1], self._num_classes, bias=bias)
 
         self.apply(lambda x: init_weights(x, mode=init_mode))
         self.to(self._device)
@@ -456,20 +464,22 @@ class JasperDecoderForSpkrClass(TrainableNM):
     def forward(self, encoder_output):
         # encoder_output = self.norm(encoder_output)
         pool = self._pooling(encoder_output)
-        mid1, emb1 = self.mid1(pool), self.mid1[:2](pool)
-        mid2, embs = self.mid2(mid1), self.mid2[:2](mid1)
+        embs = []
+
+        for layer in self.emb_layers:
+            pool, emb = layer(pool), layer[:2](pool)
+            embs.append(emb)
 
         if self.angular:
 
             self.final.weight = nn.Parameter(nn.functional.normalize(self.final.weight, p=2, dim=1))
-            embs = nn.functional.normalize(mid2, p=2, dim=1)
-            out = self.final(embs)
-            # out = self.bnorm(out)
+            out = nn.functional.normalize(pool, p=2, dim=1)
+            out = self.final(out)
 
         else:
-            out = self.final(mid2)
+            out = self.final(pool)
 
-        return out, embs
+        return out, embs[-1]
 
 
 # class SiameseDecoderForSpeakerClass(TrainableNM):
