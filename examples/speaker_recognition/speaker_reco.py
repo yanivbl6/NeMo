@@ -135,19 +135,20 @@ def create_all_dags(args, neural_factory):
     del eval_dl_params["eval"]
 
     data_layers_test = []
-    for test_set in args.eval_datasets:
+    if args.eval_datasets:
+        for test_set in args.eval_datasets:
 
-        data_layer_test = nemo_asr.AudioToSpeechLabelDataLayer(
-            manifest_filepath=test_set,
-            labels=data_layer_train.labels,
-            batch_size=args.batch_size,
-            num_workers=cpu_per_traindl,
-            time_length=time_length,
-            **eval_dl_params,
-            # normalize_transcripts=False
-        )
-        data_layers_test.append(data_layer_test)
-    # create shared modules
+            data_layer_test = nemo_asr.AudioToSpeechLabelDataLayer(
+                manifest_filepath=test_set,
+                labels=data_layer_train.labels,
+                batch_size=args.batch_size,
+                num_workers=cpu_per_traindl,
+                time_length=time_length,
+                **eval_dl_params,
+                # normalize_transcripts=False
+            )
+            data_layers_test.append(data_layer_test)
+        # create shared modules
 
     data_preprocessor = nemo_asr.AudioToMelSpectrogramPreprocessor(
         sample_rate=sample_rate, **spkr_params["AudioToMelSpectrogramPreprocessor"],
@@ -243,7 +244,7 @@ def create_all_dags(args, neural_factory):
 
         callbacks.append(eval_callback)
 
-    return loss, callbacks, steps_per_epoch, loss_test, logits_test, label_test
+    return loss, callbacks, steps_per_epoch
 
 
 def main():
@@ -278,9 +279,7 @@ def main():
         logging.info("Doing ALL GPU")
 
     # build dags
-    (train_loss, callbacks, steps_per_epoch, loss_test, logits_test, label_test,) = create_all_dags(
-        args, neural_factory
-    )
+    (train_loss, callbacks, steps_per_epoch,) = create_all_dags(args, neural_factory)
 
     if args.lr_policy is not None:
         try:

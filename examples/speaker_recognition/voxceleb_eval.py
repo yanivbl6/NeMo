@@ -15,6 +15,7 @@
 import argparse
 import json
 import os
+import sys
 
 import numpy as np
 from scipy.interpolate import interp1d
@@ -120,4 +121,5 @@ if __name__ == "__main__":
     fpr, tpr, thresholds = roc_curve(y, y_score, pos_label=1)
 
     eer = brentq(lambda x: 1.0 - x - interp1d(fpr, tpr)(x), 0.0, 1.0)
-    print("EER: {:.2f}%".format(eer * 100))
+    # print("EER: {:.2f}%".format(eer * 100))
+    sys.stdout.write("{0:.2f}\n".format(eer * 100))
