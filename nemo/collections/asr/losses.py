@@ -100,7 +100,7 @@ class AngularSoftmaxLoss(LossNM):
         # return {"loss": NeuralType(None)}
         return {"loss": NeuralType(elements_type=LossType())}
 
-    def __init__(self, s=30.0, m=0.4):
+    def __init__(self, s=20.0, m=0.5):
         super().__init__()
 
         self.eps = 1e-7
