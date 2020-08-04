@@ -32,6 +32,7 @@ from .parts.dataset import (
     TranscriptDataset,
     fixed_seq_collate_fn,
     seq_collate_fn,
+    sliced_seq_collate_fn,
 )
 from .parts.features import WaveformFeaturizer
 from .parts.parsers import make_parser
@@ -968,10 +969,12 @@ target_label_n, "offset": offset_in_sec_n}
             sampler = None
 
         if time_length:
-            collate_func = partial(fixed_seq_collate_fn, fixed_length=time_length * self._sample_rate)
+            # collate_func = partial(fixed_seq_collate_fn, fixed_length=time_length * self._sample_rate)
+            collate_func = partial(sliced_seq_collate_fn, slice_length=time_length * self._sample_rate)
         else:
             collate_func = partial(seq_collate_fn, token_pad_value=0)
 
+        print(collate_func)
         self._dataloader = torch.utils.data.DataLoader(
             dataset=self._dataset,
             batch_size=batch_size,

@@ -89,6 +89,7 @@ def create_all_dags(args, neural_factory):
         spkr_params = yaml.load(f)
 
     sample_rate = spkr_params['sample_rate']
+    time_length = spkr_params['time_length']
 
     # Calculate num_workers for dataloader
     total_cpus = os.cpu_count()
@@ -108,8 +109,9 @@ def create_all_dags(args, neural_factory):
         manifest_filepath=args.eval_datasets[0],
         labels=None,
         batch_size=args.batch_size,
-        num_workers=cpu_per_traindl,
+        num_workers=0,
         **eval_dl_params,
+        time_length=time_length
         # normalize_transcripts=False
     )
     # create shared modules
@@ -137,7 +139,7 @@ def create_all_dags(args, neural_factory):
     )
 
     # --- Assemble Validation DAG --- #
-    audio_signal_test, audio_len_test, label_test, _ = data_layer_test()
+    audio_signal_test, audio_len_test, label_test, num_slices = data_layer_test()
 
     processed_signal_test, processed_len_test = data_preprocessor(
         input_signal=audio_signal_test, length=audio_len_test
@@ -147,7 +149,7 @@ def create_all_dags(args, neural_factory):
 
     _, embeddings = decoder(encoder_output=encoded_test)
 
-    return embeddings, label_test
+    return embeddings, label_test, num_slices
 
 
 def main():
@@ -181,11 +183,14 @@ def main():
         logging.info('Doing ALL GPU')
 
     # build dags
-    embeddings, label_test = create_all_dags(args, neural_factory)
+    embeddings, label_test, num_slices = create_all_dags(args, neural_factory)
 
-    eval_tensors = neural_factory.infer(tensors=[embeddings, label_test], checkpoint_dir=args.checkpoint_dir)
+    eval_tensors = neural_factory.infer(
+        tensors=[embeddings, label_test, num_slices], checkpoint_dir=args.checkpoint_dir
+    )
     # inf_loss , inf_emb, inf_logits, inf_label = eval_tensors
-    inf_emb, inf_label = eval_tensors
+    inf_emb, inf_label, inf_numslices = eval_tensors
+
     whole_embs = []
     whole_labels = []
     manifest = open(args.eval_datasets[0], 'r').readlines()
@@ -196,15 +201,27 @@ def main():
         filename = dic['audio_filepath'].split('/')[-1]
         whole_labels.append(filename)
 
-    for idx in range(len(inf_label)):
-        whole_embs.extend(inf_emb[idx].numpy())
+    # for idx in range(len(inf_label)):
+    #     whole_embs.extend(inf_emb[idx].numpy())
 
-    embedding_dir = os.path.join(args.work_dir, 'embeddings/')
+    for idx, batch in enumerate(inf_numslices):
+        batch_embs = inf_emb[idx].numpy()
+        start_idx = 0
+        for slices in batch:
+            end_idx = start_idx + slices
+            embs = batch_embs[start_idx:end_idx]
+            embs = np.mean(embs, axis=0)
+            whole_embs.append(embs)
+            start_idx = end_idx
+
+    # import ipdb; ipdb.set_trace()
+
+    embedding_dir = os.path.join(args.work_dir, 'embeddings')
     if not os.path.exists(embedding_dir):
         os.mkdir(embedding_dir)
 
     filename = os.path.basename(args.eval_datasets[0]).split('.')[0]
-    name = embedding_dir + filename
+    name = os.path.join(embedding_dir, filename)
 
     np.save(name + '.npy', np.asarray(whole_embs))
     np.save(name + '_labels.npy', np.asarray(whole_labels))
