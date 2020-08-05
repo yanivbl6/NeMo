@@ -108,18 +108,13 @@ class AngularSoftmaxLoss(LossNM):
         self.m = m
 
     def _loss(self, logits, targets):
-        # W = nn.functional.normalize(self.linear.weight, p=2, dim=1)
-        # embs = nn.functional.normalize(embs, p=2, dim=1)
-
-        # out = self.linear(embs)
-        out = logits
-
+        
         # numerator = self.s * (torch.diagonal(out.transpose(0, 1)[targets]) - self.m)
         numerator = self.s * torch.cos(
             self.m
-            * torch.acos(torch.clamp(torch.diagonal(out.transpose(0, 1)[targets]), -1.0 + self.eps, 1 - self.eps))
+            * torch.acos(torch.clamp(torch.diagonal(logits.transpose(0, 1)[targets]), -1.0 + self.eps, 1 - self.eps))
         )
-        excl = torch.cat([torch.cat((out[i, :y], out[i, y + 1 :])).unsqueeze(0) for i, y in enumerate(targets)], dim=0)
+        excl = torch.cat([torch.cat((logits[i, :y], logits[i, y + 1 :])).unsqueeze(0) for i, y in enumerate(targets)], dim=0)
         denominator = torch.exp(numerator) + torch.sum(torch.exp(self.s * excl), dim=1)
         L = numerator - torch.log(denominator)
         return -torch.mean(L)

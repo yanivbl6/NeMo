@@ -79,3 +79,5 @@ JasperDecoderForSpkrClass:
     pool_mode: 'xvector'
     emb_sizes: 1024,1024
     angular: True
+    s: 20
+    m: 1.35

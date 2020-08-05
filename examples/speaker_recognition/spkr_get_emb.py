@@ -111,7 +111,7 @@ def create_all_dags(args, neural_factory):
         batch_size=args.batch_size,
         num_workers=0,
         **eval_dl_params,
-        time_length=time_length
+        time_length=0
         # normalize_transcripts=False
     )
     # create shared modules

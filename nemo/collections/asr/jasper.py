@@ -474,7 +474,7 @@ class JasperDecoderForSpkrClass(TrainableNM):
             for W in self.final.parameters():
                 W = F.normalize(W, p=2, dim=1)
             # self.final.weight = nn.Parameter(nn.functional.normalize(self.final.weight, p=2, dim=1))
-            out = nn.functional.normalize(pool, p=2, dim=1)
+            out = F.normalize(pool, p=2, dim=1)
             out = self.final(out)
 
         else:
