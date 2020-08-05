@@ -969,8 +969,8 @@ target_label_n, "offset": offset_in_sec_n}
             sampler = None
 
         if time_length:
-            # collate_func = partial(fixed_seq_collate_fn, fixed_length=time_length * self._sample_rate)
-            collate_func = partial(sliced_seq_collate_fn, slice_length=time_length * self._sample_rate)
+            collate_func = partial(fixed_seq_collate_fn, fixed_length=time_length * self._sample_rate)
+            # collate_func = partial(sliced_seq_collate_fn, slice_length=time_length * self._sample_rate)
         else:
             collate_func = partial(seq_collate_fn, token_pad_value=0)
 

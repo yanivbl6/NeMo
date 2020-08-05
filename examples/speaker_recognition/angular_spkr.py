@@ -175,8 +175,9 @@ def create_all_dags(args, neural_factory):
     )
 
     # emb_size = int(spkr_params["JasperDecoderForSpkrClass"]["emb_sizes"].split(",")[-1])
-
-    angular_loss = nemo_asr.AngularSoftmaxLoss()
+    s = spkr_params["JasperDecoderForSpkrClass"]["s"]
+    m = spkr_params["JasperDecoderForSpkrClass"]["m"]
+    angular_loss = nemo_asr.AngularSoftmaxLoss(s=s, m=m)
 
     # assemble train DAG
 

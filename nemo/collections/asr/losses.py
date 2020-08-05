@@ -100,7 +100,7 @@ class AngularSoftmaxLoss(LossNM):
         # return {"loss": NeuralType(None)}
         return {"loss": NeuralType(elements_type=LossType())}
 
-    def __init__(self, s=20.0, m=0.5):
+    def __init__(self, s=20.0, m=1.35):
         super().__init__()
 
         self.eps = 1e-7
@@ -114,7 +114,11 @@ class AngularSoftmaxLoss(LossNM):
         # out = self.linear(embs)
         out = logits
 
-        numerator = self.s * (torch.diagonal(out.transpose(0, 1)[targets]) - self.m)
+        # numerator = self.s * (torch.diagonal(out.transpose(0, 1)[targets]) - self.m)
+        numerator = self.s * torch.cos(
+            self.m
+            * torch.acos(torch.clamp(torch.diagonal(out.transpose(0, 1)[targets]), -1.0 + self.eps, 1 - self.eps))
+        )
         excl = torch.cat([torch.cat((out[i, :y], out[i, y + 1 :])).unsqueeze(0) for i, y in enumerate(targets)], dim=0)
         denominator = torch.exp(numerator) + torch.sum(torch.exp(self.s * excl), dim=1)
         L = numerator - torch.log(denominator)
