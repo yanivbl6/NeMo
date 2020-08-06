@@ -100,21 +100,27 @@ class AngularSoftmaxLoss(LossNM):
         # return {"loss": NeuralType(None)}
         return {"loss": NeuralType(elements_type=LossType())}
 
-    def __init__(self, s=20.0, m=1.35):
+    def __init__(self, s=20.0, m=1.35, losstype='cosface'):
         super().__init__()
 
         self.eps = 1e-7
         self.s = s
         self.m = m
+        self.losstype = losstype
 
     def _loss(self, logits, targets):
-        
-        # numerator = self.s * (torch.diagonal(out.transpose(0, 1)[targets]) - self.m)
-        numerator = self.s * torch.cos(
-            self.m
-            * torch.acos(torch.clamp(torch.diagonal(logits.transpose(0, 1)[targets]), -1.0 + self.eps, 1 - self.eps))
+
+        if self.losstype == 'cosface':
+            numerator = self.s * (torch.diagonal(logits.transpose(0, 1)[targets]) - self.m)
+        else:
+            numerator = self.s * torch.cos(
+                torch.acos(torch.clamp(torch.diagonal(logits.transpose(0, 1)[targets]), -1.0 + self.eps, 1 - self.eps))
+                + self.m
+            )
+
+        excl = torch.cat(
+            [torch.cat((logits[i, :y], logits[i, y + 1 :])).unsqueeze(0) for i, y in enumerate(targets)], dim=0
         )
-        excl = torch.cat([torch.cat((logits[i, :y], logits[i, y + 1 :])).unsqueeze(0) for i, y in enumerate(targets)], dim=0)
         denominator = torch.exp(numerator) + torch.sum(torch.exp(self.s * excl), dim=1)
         L = numerator - torch.log(denominator)
         return -torch.mean(L)
