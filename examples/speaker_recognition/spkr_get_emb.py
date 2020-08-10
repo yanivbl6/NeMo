@@ -64,6 +64,7 @@ def parse_args():
     parser.add_argument("--emb_size", default=256, type=int)
     parser.add_argument("--print_freq", default=256, type=int)
     parser.add_argument("--random_seed", default=42, type=int)
+    parser.add_argument("--ckpt_pattern", default='', type=str)
 
     args = parser.parse_args()
     if args.max_steps is not None:
@@ -186,7 +187,9 @@ def main():
     embeddings, label_test, num_slices = create_all_dags(args, neural_factory)
 
     eval_tensors = neural_factory.infer(
-        tensors=[embeddings, label_test, num_slices], checkpoint_dir=args.checkpoint_dir
+        tensors=[embeddings, label_test, num_slices],
+        checkpoint_dir=args.checkpoint_dir,
+        ckpt_pattern=args.ckpt_pattern,
     )
     # inf_loss , inf_emb, inf_logits, inf_label = eval_tensors
     inf_emb, inf_label, inf_numslices = eval_tensors

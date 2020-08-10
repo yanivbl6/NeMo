@@ -181,11 +181,12 @@ def create_all_dags(args, neural_factory):
     losstype = spkr_params["JasperDecoderForSpkrClass"]["losstype"]
     angular_loss = nemo_asr.AngularSoftmaxLoss(s=s, m=m, losstype=losstype)
 
-    encoder.restore_from(os.path.join(args.pretrainedFolder, 'JasperEncoder.pt'))
-    decoder.restore_from(os.path.join(args.pretrainedFolder, 'JasperDecoder.pt'))
-    decoder.final = torch.nn.Linear(int(emb_sizes[0]), data_layer_train.num_classes, bias=False)
-    logging.info("Loaded pretrained checkpoints from {}".format(args.pretrainedFolder))
-    decoder.to(decoder._device)
+    if args.pretrainedFolder:
+        encoder.restore_from(os.path.join(args.pretrainedFolder, 'JasperEncoder.pt'))
+        decoder.restore_from(os.path.join(args.pretrainedFolder, 'JasperDecoder.pt'))
+        decoder.final = torch.nn.Linear(int(emb_sizes[0]), data_layer_train.num_classes, bias=False)
+        logging.info("Loaded pretrained checkpoints from {}".format(args.pretrainedFolder))
+        decoder.to(decoder._device)
     # assemble train DAG
 
     audio_signal, audio_signal_len, label, label_len = data_layer_train()
