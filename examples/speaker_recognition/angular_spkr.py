@@ -101,7 +101,8 @@ def create_all_dags(args, neural_factory):
 
     # Calculate num_workers for dataloader
     total_cpus = os.cpu_count()
-    cpu_per_traindl = max(int(total_cpus / neural_factory.world_size), 1) // 2
+    cpu_per_traindl = max(int(total_cpus / neural_factory.world_size), 1) // 4
+    logging.info("number of workers considered for datalayer: {}".format(cpu_per_traindl))
 
     # create data layer for training
     train_dl_params = copy.deepcopy(spkr_params["AudioToSpeechLabelDataLayer"])
