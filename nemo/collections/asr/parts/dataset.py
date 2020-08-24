@@ -67,7 +67,7 @@ def fixed_seq_collate_fn(batch, fixed_length=16000):
     _, audio_lengths, _, tokens_lengths = zip(*batch)
 
     has_audio = audio_lengths[0] is not None
-    fixed_length = min(fixed_length, max(audio_lengths))
+    fixed_length = int(min(fixed_length, max(audio_lengths)))
     new_audio_lengths = []
     audio_signal, tokens = [], []
     for sig, sig_len, tokens_i, _ in batch:
