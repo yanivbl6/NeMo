@@ -68,7 +68,7 @@ model:
 
   language_model:
     pretrained_model_name: bert-base-uncased
-    bert_checkpoint: null
+    bert_checkpoint: null # must be a file or a directory (in case of model parallel)
     bert_config: null
     tokenizer: nemobert # 'nemobert' or 'sentencepiece'
     vocab_file: null
