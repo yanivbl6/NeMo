@@ -16,3 +16,4 @@ from nemo.collections.tts.models.glow_tts import GlowTTSModel
 from nemo.collections.tts.models.squeezewave import SqueezeWaveModel
 from nemo.collections.tts.models.tacotron2 import Tacotron2Model
 from nemo.collections.tts.models.waveglow import WaveGlowModel
+from nemo.collections.tts.models.degli import DegliModel

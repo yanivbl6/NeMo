@@ -18,12 +18,19 @@ import numpy as np
 import soundfile as sf
 import torch
 
-from nemo.collections.asr.parts import collections, parsers
+from nemo.collections.asr.parts import collections, parsers, manifest
 from nemo.collections.asr.parts.segment import AudioSegment
 from nemo.core.classes import Dataset
 from nemo.core.neural_types.elements import *
 from nemo.core.neural_types.neural_type import NeuralType
 
+import librosa
+from torch.nn.utils.rnn import pad_sequence
+from typing import Any, Dict, List, Sequence, TypeVar, Union
+
+from tqdm import tqdm
+
+DataDict = Dict[str, Any]
 
 class AudioDataset(Dataset):
     @property
@@ -207,3 +214,167 @@ class SplicedAudioDataset(Dataset):
 
     def __len__(self):
         return self.samples.shape[0] // self.n_segments
+
+class NoisySpecsDataset(Dataset):
+
+    # @property
+    # def output_types(self) -> Optional[Dict[str, NeuralType]]:
+    #     """Returns definitions of module output ports.
+    #            """
+    #     return {
+
+    #         'spec_noisy':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
+    #         'spec_clean':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
+    #         'audio_signal': NeuralType(('B', 'T'), AudioSignal()),
+    #         'mag_clean':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
+    #         'a_sig_length': NeuralType(tuple('B'), LengthsType()),
+    #     }
+    #                    (x, y, speech, mag_clean, example.audio_file , len(speech), T_x ,T_y )
+
+
+    def __init__(
+        self,
+        files_list: Union[str, 'pathlib.Path'],
+        n_fft: int,
+        hop_length: int,
+        num_snr: int,
+    ):
+        """
+        See above AudioDataset for details on dataset and manifest formats.
+
+        Unlike the regular AudioDataset, which samples random segments from each audio array as an example,
+        SplicedAudioDataset concatenates all audio arrays together and indexes segments as examples. This way,
+        the model sees more data (about 9x for LJSpeech) per epoch.
+
+        Note: this class is not recommended to be used in validation.
+
+        Args:
+            manifest_filepath (str, Path): Path to manifest json as described above. Can be comma-separated paths
+                such as "train_1.json,train_2.json" which is treated as two separate json files.
+
+        """
+        self.kwargs_stft =  dict(hop_length=hop_length, window='hann', center=True,
+                                n_fft=n_fft, dtype=np.complex64)
+        self.num_snr = num_snr
+        self.setup(files_list)
+
+    def setup(self, files_list):
+        self.samples = []
+        
+
+
+        with open(files_list, 'r') as list_file:
+
+
+            all_lines = [line for line in list_file]
+            list_file_pbar = tqdm(all_lines, desc = "Initializing Dataset", dynamic_ncols=True)
+
+            for line in list_file_pbar:
+                audio_file = line.split('|')[0]
+                speech = sf.read(audio_file)[0].astype(np.float32)
+                spec_clean = np.ascontiguousarray(librosa.stft(speech, **self.kwargs_stft))
+                mag_clean = np.ascontiguousarray(np.abs(spec_clean)[..., np.newaxis])
+                signal_power = np.mean(np.abs(speech)**2)
+
+                y = spec_clean.view(dtype=np.float32).reshape((*spec_clean.shape, 2))
+                y = torch.from_numpy(y)
+                T_y = spec_clean.shape[1]
+                mag_clean = torch.from_numpy(mag_clean)
+                for _ in enumerate(range(self.num_snr)):
+                    snr_db = -6*np.random.rand()
+                    snr = librosa.db_to_power(snr_db)
+                    noise_power = signal_power / snr
+                    noisy = speech + np.sqrt(noise_power) * np.random.randn(len(speech))
+                    spec_noisy = librosa.stft(noisy, **self.kwargs_stft)
+                    spec_noisy = np.ascontiguousarray(spec_noisy)
+                    T_x = spec_noisy.shape[1]
+                    x = spec_noisy.view(dtype=np.float32).reshape((*spec_noisy.shape, 2))
+                    x = torch.from_numpy(x)
+                    self.samples.append(
+                        dict(x=x,
+                            wav=torch.from_numpy(speech),
+                            y=y,
+                            y_mag=mag_clean,
+                            path_speech=audio_file,
+                            length=len(speech),
+                            T_x = T_x,
+                            T_y = T_y
+                            )
+                        ##(x, y, speech, mag_clean, example.audio_file , len(speech), T_x ,T_y )
+                    )
+
+    def __getitem__(self, index):
+        return self.samples[index]
+
+
+    def __len__(self):
+        return len(self.samples)
+
+    @torch.no_grad()
+    def collate_fn(self, batch):
+        """ return data with zero-padding
+
+        Important data like x, y are all converted to Tensor(cpu).
+        :param batch:
+        :return: DataDict
+            Values can be an Tensor(cpu), list of str, ndarray of int.
+        """
+
+        result = dict()
+        T_xs = np.array([item.pop('T_x') for item in batch])
+        idxs_sorted = np.argsort(T_xs)
+        T_xs = T_xs[idxs_sorted].tolist()
+        T_ys = [batch[idx].pop('T_y') for idx in idxs_sorted]
+        length = [batch[idx].pop('length') for idx in idxs_sorted]
+
+        result['T_xs'], result['T_ys'], result['length'] = T_xs, T_ys, length
+
+        for key, value in batch[0].items():
+            if type(value) == str or key == 'wav':
+                list_data = [batch[idx][key] for idx in idxs_sorted]
+                set_data = set(list_data)
+                if len(set_data) == 1:
+                    result[key] = set_data.pop()
+                else:
+                    result[key] = list_data
+            else:
+                if len(batch) > 1:
+                    # B, T, F, C
+                    data = [batch[idx][key].permute(1, 0, 2) for idx in idxs_sorted]
+                    data = pad_sequence(data, batch_first=True)
+                    # B, C, F, T
+                    data = data.permute(0, 3, 2, 1)
+                else:  # B, C, F, T
+                    data = batch[0][key].unsqueeze(0).permute(0, 3, 1, 2)
+
+                result[key] = data.contiguous()
+
+        return result
+
+    @staticmethod
+    @torch.no_grad()
+    def decollate_padded(batch: DataDict, idx: int) -> DataDict:
+        """ select the `idx`-th data, get rid of padded zeros and return it.
+
+        Important data like x, y are all converted to ndarray.
+        :param batch:
+        :param idx:
+        :return: DataDict
+            Values can be an str or ndarray.
+        """
+        result = dict()
+        for key, value in batch.items():
+            if type(value) == str:
+                result[key] = value
+            elif type(value) == list:
+                result[key] = value[idx]
+            elif not key.startswith('T_'):
+                T_xy = 'T_xs' if 'x' in key else 'T_ys'
+                value = value[idx, :, :, :batch[T_xy][idx]]  # C, F, T
+                value = value.permute(1, 2, 0).contiguous()  # F, T, C
+                value = value.numpy()
+                if value.shape[-1] == 2:
+                    value = value.view(dtype=np.complex64)  # F, T, 1
+                result[key] = value
+
+        return result
