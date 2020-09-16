@@ -270,8 +270,8 @@ class DegliModel(Vocoder):
         loss = self.calc_loss(output_loss, y, T_ys)
         cnt = x.shape[0]
         for p in range(cnt):
-            y_wav_path = batch['audio_file'][p].cpu()
-            y_wav = sf.read(audio_file)[0].astype(np.float32)
+            y_wav_path = batch['path_speech'][p].cpu()
+            y_wav = sf.read(y_wav_path)[0].astype(np.float32)
 
 
             n_sample=batch['length'][p]
