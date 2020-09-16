@@ -292,7 +292,7 @@ class NoisySpecsDataset(Dataset):
                     x = torch.from_numpy(x)
                     self.samples.append(
                         dict(x=x,
-                            wav=torch.from_numpy(speech),
+##                            wav=torch.from_numpy(speech),
                             y=y,
                             y_mag=mag_clean,
                             path_speech=audio_file,
