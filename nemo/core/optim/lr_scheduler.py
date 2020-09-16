@@ -414,6 +414,7 @@ def prepare_lr_scheduler(
     # Test to see if config follows above schema
 
     addMaxArgsFlag = True
+    interval = 'step'
     if scheduler_config is not None:
         if 'args' in scheduler_config:
             scheduler_args = scheduler_config.pop('args')
@@ -425,6 +426,8 @@ def prepare_lr_scheduler(
 
             if 'name' in scheduler_args and scheduler_args['name'] == 'ReduceLROnPlateau':
                 addMaxArgsFlag = False
+                interval = 'epoch'
+
             scheduler_args.pop('name', None)
             scheduler_args.pop('iters_per_batch', None)
             scheduler_args.pop('monitor', None)
@@ -560,7 +563,7 @@ def prepare_lr_scheduler(
 
     schedule_dict = {
         'scheduler': schedule,
-        'interval': 'step',
+        'interval': interval,
         'frequency': 1,
         'monitor': monitor,
         'reduce_on_plateau': reduce_lr_on_plateau,
