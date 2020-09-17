@@ -203,18 +203,6 @@ class DegliModel(Vocoder):
                 
             return audios
 
-
-
-
-    def preprocess(self, data: Dict[str, Tensor]) -> Tuple[Tensor, Tensor]:
-        # B, F, T, C
-        x = data['x']
-        mag = data['y_mag']
-        max_length = max(data['length'])
-        y = data['y']
-        T_ys = data['T_ys']
-
-        return x, mag, max_length, y, T_ys
         
     def calc_loss(self, out_blocks: Tensor, y: Tensor, T_ys: Sequence[int]) -> Tensor:
         """
@@ -240,7 +228,7 @@ class DegliModel(Vocoder):
         self.mode = OperationMode.training
         self.degli.mode = OperationMode.training
 
-        x, mag, max_length, y, T_ys = self.preprocess(batch)
+        x, mag, max_length, y, T_ys, _, _ = batch
         output_loss, _, _ = self(x=x, mag=mag, max_length= max_length, repeats= self._cfg.train_params.repeat_training)
         loss = self.calc_loss(output_loss, y, T_ys) 
 
@@ -263,18 +251,18 @@ class DegliModel(Vocoder):
         self.degli.mode = OperationMode.validation
         val_repeats = self._cfg.train_params.repeat_validation
 
-        x, mag, max_length, y, T_ys = self.preprocess(batch)
+        x, mag, max_length, y, T_ys, length, path_speech =batch
         output_loss, output, _ = self(x=x, mag=mag, max_length= max_length, repeats= 1)
         _, output_x, _ = self(x=x, mag=mag, max_length= max_length, repeats= val_repeats)
 
         loss = self.calc_loss(output_loss, y, T_ys)
         cnt = x.shape[0]
         for p in range(cnt):
-            y_wav_path = batch['path_speech'][p]
+            y_wav_path = path_speech[p]
             y_wav = sf.read(y_wav_path)[0].astype(np.float32)
 
 
-            n_sample=batch['length'][p]
+            n_sample=length[p]
             out = self.postprocess(output, T_ys, p)
             out_wav = reconstruct_wave(out, kwargs_istft=self.kwargs_istft , n_sample=n_sample)
             measure = calc_using_eval_module(y_wav, out_wav)

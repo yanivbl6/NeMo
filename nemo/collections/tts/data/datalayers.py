@@ -222,20 +222,20 @@ class SplicedAudioDataset(Dataset):
 
 class NoisySpecsDataset(Dataset):
 
-    # @property
-    # def output_types(self) -> Optional[Dict[str, NeuralType]]:
-    #     """Returns definitions of module output ports.
-    #            """
-    #     return {
+    @property
+    def output_types(self) -> Optional[Dict[str, NeuralType]]:
+        """Returns definitions of module output ports.
+               """
+        return {
 
-    #         'spec_noisy':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
-    #         'spec_clean':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
-    #         'audio_signal': NeuralType(('B', 'T'), AudioSignal()),
-    #         'mag_clean':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
-    #         'a_sig_length': NeuralType(tuple('B'), LengthsType()),
-    #     }
-    #                    (x, y, speech, mag_clean, example.audio_file , len(speech), T_x ,T_y )
-
+            'x':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
+            'mag':   NeuralType(('B', 'any', 'F' ,'T'),SpectrogramType()),
+            'max_length': NeuralType(None, LengthsType()),
+            'y':   NeuralType(('B', 'C', 'F' ,'T'),SpectrogramType()),
+            'T_ys': NeuralType(tuple('B'), LengthsType()),
+            'length': NeuralType(tuple('B'), LengthsType()),
+            'path_speech': NeuralType(tuple('B'), StringType()),
+        }
 
     def __init__(
         self,
@@ -320,6 +320,16 @@ class NoisySpecsDataset(Dataset):
                     data = batch[0][key].unsqueeze(0).permute(0, 3, 1, 2)
 
                 result[key] = data.contiguous()
+
+        x = result['x']
+        mag = result['y_mag']
+        max_length = max(result['length'])
+        y = result['y']
+        T_ys = result['T_ys']
+        length = result['length']
+        path_speech = result['path_speech']
+        return  x, mag, max_length, y, T_ys, length, path_speech
+
 
         return result
 
