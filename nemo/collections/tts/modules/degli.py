@@ -312,9 +312,6 @@ class DeGLI_ED(nn.Module):
 
 
     def forward(self, x, mag_replaced, consistent, train_step = -1):
-        
-        
-        ##import pdb; pdb.set_trace()
         x = torch.cat([x, mag_replaced, consistent], dim=1)
 
         encoders_output = []

@@ -29,6 +29,11 @@ from torch.nn.utils.rnn import pad_sequence
 from typing import Any, Dict, List, Sequence, TypeVar, Union
 
 from tqdm import tqdm
+import logging
+import shutil
+import sys
+import os
+from pathlib import Path
 
 DataDict = Dict[str, Any]
 
@@ -234,11 +239,13 @@ class NoisySpecsDataset(Dataset):
 
     def __init__(
         self,
-        files_list: Union[str, 'pathlib.Path'],
+        destination: Union[str, 'pathlib.Path'],
+        subdir: str,
         n_fft: int,
         hop_length: int,
         num_snr: int,
     ):
+        self.tar_dir = Path("%s/degli_data_%d_%dx%d/%s/" % (destination,n_fft,hop_length,num_snr,subdir))
         """
         See above AudioDataset for details on dataset and manifest formats.
 
@@ -253,62 +260,27 @@ class NoisySpecsDataset(Dataset):
                 such as "train_1.json,train_2.json" which is treated as two separate json files.
 
         """
-        self.kwargs_stft =  dict(hop_length=hop_length, window='hann', center=True,
-                                n_fft=n_fft, dtype=np.complex64)
-        self.num_snr = num_snr
-        self.setup(files_list)
-
-    def setup(self, files_list):
-        self.samples = []
-        
-
-
-        with open(files_list, 'r') as list_file:
-
-
-            all_lines = [line for line in list_file]
-            list_file_pbar = tqdm(all_lines, desc = "Initializing Dataset", dynamic_ncols=True)
-
-            for line in list_file_pbar:
-                audio_file = line.split('|')[0]
-                speech = sf.read(audio_file)[0].astype(np.float32)
-                spec_clean = np.ascontiguousarray(librosa.stft(speech, **self.kwargs_stft))
-                mag_clean = np.ascontiguousarray(np.abs(spec_clean)[..., np.newaxis])
-                signal_power = np.mean(np.abs(speech)**2)
-
-                y = spec_clean.view(dtype=np.float32).reshape((*spec_clean.shape, 2))
-                y = torch.from_numpy(y)
-                T_y = spec_clean.shape[1]
-                mag_clean = torch.from_numpy(mag_clean)
-                for _ in enumerate(range(self.num_snr)):
-                    snr_db = -6*np.random.rand()
-                    snr = librosa.db_to_power(snr_db)
-                    noise_power = signal_power / snr
-                    noisy = speech + np.sqrt(noise_power) * np.random.randn(len(speech))
-                    spec_noisy = librosa.stft(noisy, **self.kwargs_stft)
-                    spec_noisy = np.ascontiguousarray(spec_noisy)
-                    T_x = spec_noisy.shape[1]
-                    x = spec_noisy.view(dtype=np.float32).reshape((*spec_noisy.shape, 2))
-                    x = torch.from_numpy(x)
-                    self.samples.append(
-                        dict(x=x,
-##                            wav=torch.from_numpy(speech),
-                            y=y,
-                            y_mag=mag_clean,
-                            path_speech=audio_file,
-                            length=len(speech),
-                            T_x = T_x,
-                            T_y = T_y
-                            )
-                        ##(x, y, speech, mag_clean, example.audio_file , len(speech), T_x ,T_y )
-                    )
+        self._all_files = [f for f in os.listdir(self.tar_dir) if 'npz' in f]
 
     def __getitem__(self, index):
-        return self.samples[index]
 
+        file = Path(self.tar_dir / self._all_files[index])
+        sample = dict()
+
+        with np.load(file, mmap_mode='r') as npz_data:
+            for k,v in npz_data.items():
+                if k in ['x','y','y_mag']:
+                    sample[k] =  torch.from_numpy(v)
+                elif k == "path_speech":
+                    sample[k] =  str(v)
+                elif k in ['T_x','T_y','length']:
+                    sample[k] = int(v)
+                else:
+                    sample[k] =  v
+        return sample
 
     def __len__(self):
-        return len(self.samples)
+        return len(self._all_files)
 
     @torch.no_grad()
     def collate_fn(self, batch):
@@ -330,7 +302,7 @@ class NoisySpecsDataset(Dataset):
         result['T_xs'], result['T_ys'], result['length'] = T_xs, T_ys, length
 
         for key, value in batch[0].items():
-            if type(value) == str or key == 'wav':
+            if type(value) == str:
                 list_data = [batch[idx][key] for idx in idxs_sorted]
                 set_data = set(list_data)
                 if len(set_data) == 1:
@@ -378,3 +350,84 @@ class NoisySpecsDataset(Dataset):
                 result[key] = value
 
         return result
+
+def setup(files_list, num_snr, kwargs_stft, dest,desc):
+
+    os.makedirs(dest)
+    with open(files_list, 'r') as list_file:
+        all_lines = [line for line in list_file]
+        list_file_pbar = tqdm(all_lines, desc =desc , dynamic_ncols=True)
+
+        i_speech = 0
+        for line in list_file_pbar:
+            audio_file = line.split('|')[0]
+            speech = sf.read(audio_file)[0].astype(np.float32)
+            spec_clean = np.ascontiguousarray(librosa.stft(speech, **kwargs_stft))
+            mag_clean = np.ascontiguousarray(np.abs(spec_clean)[..., np.newaxis])
+            signal_power = np.mean(np.abs(speech)**2)
+
+            y = spec_clean.view(dtype=np.float32).reshape((*spec_clean.shape, 2))
+            ##y = torch.from_numpy(y)
+            T_y = spec_clean.shape[1]
+            ##mag_clean = torch.from_numpy(mag_clean)
+            for k in range(num_snr):
+                snr_db = -6*np.random.rand()
+                snr = librosa.db_to_power(snr_db)
+                noise_power = signal_power / snr
+                noisy = speech + np.sqrt(noise_power) * np.random.randn(len(speech))
+                spec_noisy = librosa.stft(noisy, **kwargs_stft)
+                spec_noisy = np.ascontiguousarray(spec_noisy)
+                T_x = spec_noisy.shape[1]
+                x = spec_noisy.view(dtype=np.float32).reshape((*spec_noisy.shape, 2))
+                ##x = torch.from_numpy(x)
+                mdict =dict(x=x,
+                            y=y,
+                            y_mag=mag_clean,
+                            path_speech=audio_file,
+                            length=len(speech),
+                            T_x = T_x,
+                            T_y = T_y
+                            )
+                np.savez(f"{dest}/audio_{i_speech}_{k}.npz",
+                            **mdict,
+                            )
+                i_speech = i_speech + 1
+
+    return i_speech
+
+def DegliProprocssing(valid_filelist, train_filelist, n_fft, hop_length,num_snr  , destination):
+    kwargs_stft =  dict(hop_length=hop_length, window='hann', center=True,
+                            n_fft=n_fft, dtype=np.complex64)
+    num_snr = num_snr
+
+    tar_dir = "%s/degli_data_%d_%dx%d/" % (destination,n_fft,hop_length,num_snr)
+    if not os.path.isdir(tar_dir):
+
+        if valid_filelist == "none" or train_filelist== "none":
+            logging.error(f"Director {tar_dir} does not exist. Filelists for validation and train must be provided.")
+            raise NameError("Missing Argument")
+        else:
+            logging.info(f"Director {tar_dir} does not exist. Preprocessing audio files listed in {valid_filelist}, {train_filelist} to create new dataset.")
+        os.makedirs(tar_dir)
+        n_train = 0
+        n_valid = 0
+        try:
+            n_train = setup(train_filelist, num_snr, kwargs_stft, tar_dir + "train/", desc= "Initializing Train Dataset" )
+            n_valid =  setup(valid_filelist, num_snr, kwargs_stft, tar_dir  + "valid/", desc= "Initializing Validation Dataset"  )
+        except FileNotFoundError as err:
+            shutil.rmtree(tar_dir)
+            raise err
+        except:
+            e = sys.exc_info()[0]
+            shutil.rmtree(tar_dir)
+            raise e
+
+        if n_train == 0:
+            shutil.rmtree(tar_dir)
+            raise EOFError("Dataset initialization failed. No files to preprocess train dataset")
+
+        if  n_valid == 0:
+            shutil.rmtree(tar_dir)
+            raise EOFError("Dataset initialization failed. No files to preprocess validation dataset")
+
+    return tar_dir
