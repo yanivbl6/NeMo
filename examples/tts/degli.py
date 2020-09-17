@@ -23,7 +23,6 @@ from nemo.collections.tts.data.datalayers import DegliProprocssing
 
 @hydra_runner(config_path="conf", config_name="degli")
 def main(cfg):
-
     DegliProprocssing(**cfg.model.preprocessor)
     trainer = pl.Trainer(**cfg.trainer)
     exp_manager(trainer, cfg.get("exp_manager", None))
@@ -31,7 +30,6 @@ def main(cfg):
     epoch_time_logger = LogEpochTimeCallback()
     trainer.callbacks.extend([epoch_time_logger])
     trainer.fit(model)
-
 
 if __name__ == '__main__':
     main()  # noqa pylint: disable=no-value-for-parameter
