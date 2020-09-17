@@ -12,45 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence, Tuple
 
+import librosa
+import numpy as np
+import soundfile as sf
 import torch
 from hydra.utils import instantiate
+from numpy import ndarray
 from omegaconf import MISSING, DictConfig, OmegaConf, open_dict
+from pesq import pesq
+from pystoi import stoi
+from torch import Tensor, nn
 
 from nemo.collections.tts.models.base import Vocoder
 from nemo.collections.tts.modules.degli import OperationMode
 from nemo.core.classes.common import PretrainedModelInfo, typecheck
 from nemo.core.neural_types.elements import (
     AudioSignal,
-    LengthsType,
-    SpectrogramType,
-    NormalDistributionSamplesType,
-    VoidType,
     IntType,
+    LengthsType,
+    NormalDistributionSamplesType,
+    SpectrogramType,
+    VoidType,
 )
 from nemo.core.neural_types.neural_type import NeuralType
 from nemo.utils import logging
 
-from  torch import nn, Tensor
-import librosa
-import numpy as np
-import warnings
-from numpy import ndarray
-from typing import Any, Dict, Optional, Sequence, Tuple
-
-import soundfile as sf
-from pesq import pesq
-from pystoi import stoi
 
 def EvalModule(clean, denoised, fs):
-    stoi_score = stoi(clean, denoised, fs, extended = False)
-    pesq_score = pesq( fs , np.asarray(clean), denoised, 'wb')
-    return stoi_score , pesq_score
+    stoi_score = stoi(clean, denoised, fs, extended=False)
+    pesq_score = pesq(fs, np.asarray(clean), denoised, 'wb')
+    return stoi_score, pesq_score
 
-def calc_using_eval_module(y_clean: ndarray, y_est: ndarray,
-                           T_ys: Sequence[int] = (0,), sampling_rate = 16000) -> Dict[str, float]:
+
+def calc_using_eval_module(
+    y_clean: ndarray, y_est: ndarray, T_ys: Sequence[int] = (0,), sampling_rate=16000
+) -> Dict[str, float]:
     """ calculate metric using EvalModule. y can be a batch.
 
     :param y_clean:
@@ -65,10 +65,9 @@ def calc_using_eval_module(y_clean: ndarray, y_est: ndarray,
     if T_ys == (0,):
         T_ys = (y_clean.shape[1],) * y_clean.shape[0]
 
-    stoi_result, pesq_results = EvalModule(y_clean[0, :T_ys[0]], y_est[0, :T_ys[0]], sampling_rate)
+    stoi_result, pesq_results = EvalModule(y_clean[0, : T_ys[0]], y_est[0, : T_ys[0]], sampling_rate)
 
     return {'STOI': stoi_result, 'PESQ': pesq_results}
-
 
 
 @dataclass
@@ -78,6 +77,7 @@ class DegliConfig:
     validation_ds: Optional[Dict[Any, Any]] = None
     train_params: Optional[Dict[Any, Any]] = None
     sched: Optional[Dict[Any, Any]] = None
+
 
 def reconstruct_wave(*args: ndarray, kwargs_istft, n_sample=-1) -> ndarray:
     """ reconstruct time-domain wave from spectrogram
@@ -108,11 +108,11 @@ def reconstruct_wave(*args: ndarray, kwargs_istft, n_sample=-1) -> ndarray:
     wave = librosa.istft(spec, **kwargs_istft, **kwarg_len)
     return wave
 
+
 class DegliModel(Vocoder):
     """Deep Griffin Lim model used to convert betweeen spectrograms and audio"""
 
     def __init__(self, cfg: DictConfig, trainer: 'Trainer' = None):
-
 
         if isinstance(cfg, dict):
             cfg = OmegaConf.create(cfg)
@@ -129,48 +129,44 @@ class DegliModel(Vocoder):
 
         self.degli = instantiate(self._cfg.degli)
         self.mode = OperationMode.infer
-        self.criterion = nn.L1Loss(reduction='none') ## maybe should be loss subclass?
-        self.l_hop  =self._cfg.degli.hop_length
-        self.n_fft  =self._cfg.degli.n_fft
+        self.criterion = nn.L1Loss(reduction='none')  ## maybe should be loss subclass?
+        self.l_hop = self._cfg.degli.hop_length
+        self.n_fft = self._cfg.degli.n_fft
         self.kwargs_stft = dict(hop_length=self.l_hop, window='hann', center=True, n_fft=self.n_fft, dtype=np.float32)
         self.kwargs_istft = dict(hop_length=self.l_hop, window='hann', center=True, dtype=np.float32)
 
         len_weight = self._cfg.train_params.repeat_training
-        self.loss_weight = nn.Parameter(torch.tensor(
-            [1./i for i in range(len_weight, 0, -1)]
-        ), requires_grad = False)
+        self.loss_weight = nn.Parameter(torch.tensor([1.0 / i for i in range(len_weight, 0, -1)]), requires_grad=False)
         self.loss_weight /= self.loss_weight.sum()
 
     @property
     def input_types(self):
         return {
-            "x": NeuralType(('B', 'C' , 'D', 'T'), SpectrogramType()),
-            "mag": NeuralType(('B', 'any' , 'D', 'T'), SpectrogramType()),
-            "max_length": NeuralType(None,LengthsType()),
-            "repeats": NeuralType(None,IntType()),
+            "x": NeuralType(('B', 'C', 'D', 'T'), SpectrogramType()),
+            "mag": NeuralType(('B', 'any', 'D', 'T'), SpectrogramType()),
+            "max_length": NeuralType(None, LengthsType()),
+            "repeats": NeuralType(None, IntType()),
         }
 
     @property
     def output_types(self):
         if self.mode == OperationMode.training or self.mode == OperationMode.validation:
             return {
-                "out_repeats": NeuralType(('B', 'any', 'C' , 'D', 'T'), SpectrogramType()),
-                "final_out": NeuralType(('B', 'C' , 'D', 'T'), SpectrogramType()),
-                "residual": NeuralType(('B', 'C' , 'D', 'T'), SpectrogramType()),
+                "out_repeats": NeuralType(('B', 'any', 'C', 'D', 'T'), SpectrogramType()),
+                "final_out": NeuralType(('B', 'C', 'D', 'T'), SpectrogramType()),
+                "residual": NeuralType(('B', 'C', 'D', 'T'), SpectrogramType()),
             }
         else:
             return {
-                "final_out": NeuralType(('B', 'C' , 'D', 'T'), SpectrogramType()),
+                "final_out": NeuralType(('B', 'C', 'D', 'T'), SpectrogramType()),
             }
 
     @typecheck()
     def forward(self, *, x, mag, max_length, repeats):
         if self.mode != self.degli.mode:
-            raise ValueError(
-                f"Degli's mode {self.mode} does not match DegliModule's mode {self.degli.mode}"
-            )
-        
-        tensors = self.degli(x=x, mag=mag, max_length= max_length, repeat= repeats)
+            raise ValueError(f"Degli's mode {self.mode} does not match DegliModule's mode {self.degli.mode}")
+
+        tensors = self.degli(x=x, mag=mag, max_length=max_length, repeat=repeats)
         return tensors  # audio_pred
 
     # @typecheck(
@@ -178,32 +174,29 @@ class DegliModel(Vocoder):
     #     output_types={"audio": NeuralType(('B', 'T'), AudioSignal())},
     # )
 
-
     def convert_spectrogram_to_audio(self, spec: torch.Tensor, repeats: int = 32) -> torch.Tensor:
         self.eval()
         self.mode = OperationMode.infer
         self.degli.mode = OperationMode.infer
 
-        x = torch.normal(0,1,[spec.shape[0],2,spec.shape[2],spec.shape[3]]).to(self.device)
-        length =(spec.shape[3]-1)*self.l_hop    
+        x = torch.normal(0, 1, [spec.shape[0], 2, spec.shape[2], spec.shape[3]]).to(self.device)
+        length = (spec.shape[3] - 1) * self.l_hop
         with torch.no_grad():
-            y = self.degli(x=x, mag=spec, max_length= length, repeat=repeats)
+            y = self.degli(x=x, mag=spec, max_length=length, repeat=repeats)
 
-            
         if y.shape[0] == 1:
-            y = self.postprocess(y, y.shape[1],0)
-            audio = reconstruct_wave(y,  kwargs_istft=self.kwargs_istft , n_sample = (y.shape[1]-1)*self.l_hop)
+            y = self.postprocess(y, y.shape[1], 0)
+            audio = reconstruct_wave(y, kwargs_istft=self.kwargs_istft, n_sample=(y.shape[1] - 1) * self.l_hop)
             return audio
         else:
             audios = []
             for i in range(y.shape[0]):
-                y_i = self.postprocess(y, y.shape[1],i)
-                audio = reconstruct_wave(y_i,  kwargs_istft=self.kwargs_istft , n_sample = (y_i.shape[1]-1)*self.l_hop)
+                y_i = self.postprocess(y, y.shape[1], i)
+                audio = reconstruct_wave(y_i, kwargs_istft=self.kwargs_istft, n_sample=(y_i.shape[1] - 1) * self.l_hop)
                 audios.append(audio)
-                
+
             return audios
 
-        
     def calc_loss(self, out_blocks: Tensor, y: Tensor, T_ys: Sequence[int]) -> Tensor:
         """
         out_blocks: B, depth, C, F, T
@@ -223,14 +216,13 @@ class DegliModel(Vocoder):
             loss = loss_blocks @ self.loss_weight
         return loss
 
-
     def training_step(self, batch, batch_idx):
         self.mode = OperationMode.training
         self.degli.mode = OperationMode.training
 
         x, mag, max_length, y, T_ys, _, _ = batch
-        output_loss, _, _ = self(x=x, mag=mag, max_length= max_length, repeats= self._cfg.train_params.repeat_training)
-        loss = self.calc_loss(output_loss, y, T_ys) 
+        output_loss, _, _ = self(x=x, mag=mag, max_length=max_length, repeats=self._cfg.train_params.repeat_training)
+        loss = self.calc_loss(output_loss, y, T_ys)
 
         output = {
             'loss': loss,
@@ -240,8 +232,8 @@ class DegliModel(Vocoder):
         return output
 
     @torch.no_grad()
-    def postprocess(self, output: Tensor, Ts: ndarray, idx: int) :
-        one = output[idx, :, :, :Ts[idx]]
+    def postprocess(self, output: Tensor, Ts: ndarray, idx: int):
+        one = output[idx, :, :, : Ts[idx]]
         one = one.permute(1, 2, 0).contiguous()  # F, T, 2
         one = one.cpu().numpy().view(dtype=np.complex64)  # F, T, 1
         return one
@@ -251,9 +243,9 @@ class DegliModel(Vocoder):
         self.degli.mode = OperationMode.validation
         val_repeats = self._cfg.train_params.repeat_validation
 
-        x, mag, max_length, y, T_ys, length, path_speech =batch
-        output_loss, output, _ = self(x=x, mag=mag, max_length= max_length, repeats= 1)
-        _, output_x, _ = self(x=x, mag=mag, max_length= max_length, repeats= val_repeats)
+        x, mag, max_length, y, T_ys, length, path_speech = batch
+        output_loss, output, _ = self(x=x, mag=mag, max_length=max_length, repeats=1)
+        _, output_x, _ = self(x=x, mag=mag, max_length=max_length, repeats=val_repeats)
 
         loss = self.calc_loss(output_loss, y, T_ys)
         cnt = x.shape[0]
@@ -261,16 +253,15 @@ class DegliModel(Vocoder):
             y_wav_path = path_speech[p]
             y_wav = sf.read(y_wav_path)[0].astype(np.float32)
 
-
-            n_sample=length[p]
+            n_sample = length[p]
             out = self.postprocess(output, T_ys, p)
-            out_wav = reconstruct_wave(out, kwargs_istft=self.kwargs_istft , n_sample=n_sample)
+            out_wav = reconstruct_wave(out, kwargs_istft=self.kwargs_istft, n_sample=n_sample)
             measure = calc_using_eval_module(y_wav, out_wav)
             stoi = torch.tensor(measure['STOI'])
             pesq = torch.tensor(measure['PESQ'])
 
             out = self.postprocess(output_x, T_ys, p)
-            out_wav = reconstruct_wave(out, kwargs_istft=self.kwargs_istft ,n_sample=n_sample)
+            out_wav = reconstruct_wave(out, kwargs_istft=self.kwargs_istft, n_sample=n_sample)
             measure = calc_using_eval_module(y_wav, out_wav)
             stoi_x = torch.tensor(measure['STOI'])
             pesq_x = torch.tensor(measure['PESQ'])
@@ -287,7 +278,7 @@ class DegliModel(Vocoder):
         }
 
     def validation_epoch_end(self, outputs):
-        tensorboard_logs={}
+        tensorboard_logs = {}
 
         for k in outputs[0].keys():
             tensorboard_logs[k] = torch.stack([x[k] for x in outputs]).mean()

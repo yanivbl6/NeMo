@@ -15,11 +15,11 @@
 import pytorch_lightning as pl
 
 from nemo.collections.common.callbacks import LogEpochTimeCallback
+from nemo.collections.tts.data.datalayers import DegliProprocssing
 from nemo.collections.tts.models import DegliModel
 from nemo.core.config import hydra_runner
 from nemo.utils.exp_manager import exp_manager
 
-from nemo.collections.tts.data.datalayers import DegliProprocssing
 
 @hydra_runner(config_path="conf", config_name="degli")
 def main(cfg):
@@ -30,6 +30,7 @@ def main(cfg):
     epoch_time_logger = LogEpochTimeCallback()
     trainer.callbacks.extend([epoch_time_logger])
     trainer.fit(model)
+
 
 if __name__ == '__main__':
     main()  # noqa pylint: disable=no-value-for-parameter
